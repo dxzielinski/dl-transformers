@@ -184,3 +184,5 @@ data-audio/
 data/
 data-mel-spectrograms/
 checkpoints/
+mlruns/
+data-no-noise-no-silence/

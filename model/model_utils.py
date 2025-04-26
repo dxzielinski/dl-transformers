@@ -24,8 +24,7 @@ import torch
 import lightning as L
 import torchmetrics
 from torchvision.datasets import DatasetFolder
-from torchvision.models.efficientnet import efficientnet_v2_s, EfficientNet_V2_S_Weights
-from torchvision.ops.misc import Conv2dNormActivation
+
 
 from model_config import TASK, NUM_CLASSES
 
@@ -47,9 +46,7 @@ class BasicCNN(torch.nn.Module):
         h1, w1 = _calc_conv_output_size(pooling_size=1)
         h2, w2 = _calc_conv_output_size((h1, w1), pooling_size=1)
         h3, w3 = _calc_conv_output_size((h2, w2), pooling_size=1)
-        h4, w4 = _calc_conv_output_size((h3, w3), pooling_size=1)
-        h5, w5 = _calc_conv_output_size((h4, w4), pooling_size=1)
-        flatten_dim = 128 * h5 * w5
+        flatten_dim = 128 * h3 * w3
 
         self.layers = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=2, stride=1),
@@ -61,14 +58,6 @@ class BasicCNN(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(1),
             torch.nn.Conv2d(in_channels=64, out_channels=128, kernel_size=2, stride=1),
-            torch.nn.BatchNorm2d(128),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(1),
-            torch.nn.Conv2d(in_channels=128, out_channels=256, kernel_size=2, stride=1),
-            torch.nn.BatchNorm2d(256),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(1),
-            torch.nn.Conv2d(in_channels=256, out_channels=128, kernel_size=2, stride=1),
             torch.nn.BatchNorm2d(128),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(1),
@@ -187,47 +176,24 @@ class Model(L.LightningModule):
         self.test_batch_outputs.clear()
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(
+        optimizer = torch.optim.SGD(
             self.model.parameters(),
             lr=self.learning_rate,
             weight_decay=self.hyperparameters["weight_decay"],
+            momentum=0.9,
         )
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer=optimizer, T_max=10
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer=optimizer, max_lr=4.0, epochs=50, steps_per_epoch=177
         )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "val_loss",
+                "interval": "step",
+                "frequency": 1,
+                "strict": False,
             },
         }
-
-
-class PretrainedEfficientNetV2(Model):
-    def __init__(
-        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
-    ):
-        super().__init__(
-            hyperparameters={
-                "learning_rate": learning_rate,
-                "dropout": dropout,
-                "weight_decay": weight_decay,
-                "batch_size": batch_size,
-            }
-        )
-        self.model = efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.IMAGENET1K_V1)
-        self.model.classifier[1] = torch.nn.Linear(
-            self.model.classifier[1].in_features, NUM_CLASSES
-        )
-        self.model.layers[0] = Conv2dNormActivation(
-            1,
-            self.model.firstconv_output_channels,
-            kernel_size=3,
-            stride=2,
-            norm_layer=torch.nn.BatchNorm2d,
-            activation_layer=torch.nn.SiLU,
-        )
 
 
 def pt_loader(path):
@@ -268,7 +234,7 @@ class ClassificationData(L.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=8,
+            num_workers=31,
             persistent_workers=True,
         )
 
@@ -277,7 +243,7 @@ class ClassificationData(L.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=8,
+            num_workers=31,
             persistent_workers=True,
         )
 
@@ -286,5 +252,5 @@ class ClassificationData(L.LightningDataModule):
             self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=8,
+            num_workers=31,
         )
