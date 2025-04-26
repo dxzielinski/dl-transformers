@@ -8,6 +8,8 @@ import torch
 import torchaudio
 import noisereduce as nr
 from torchaudio.transforms import MelSpectrogram
+torchaudio.set_audio_backend("soundfile") #explicitly set to use soundfile
+
 
 
 class AudioProcessing(torch.nn.Module):

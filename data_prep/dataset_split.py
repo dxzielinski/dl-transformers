@@ -19,9 +19,9 @@ import shutil
 import random
 
 random.seed(111)
-downloaded_data_dir = (
-    "C:/Users/SPCX/Downloads/tensorflow-speech-recognition-challenge/train/train/audio"
-)
+project_root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+downloaded_data_dir = os.path.join(project_root_dir, "raw_audio")
+
 labels = os.listdir(downloaded_data_dir)
 project_root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH = os.path.join(project_root_dir, "data-audio")
