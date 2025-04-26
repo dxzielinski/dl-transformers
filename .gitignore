@@ -178,3 +178,4 @@ pyrightconfig.json
 data-audio/
 data/
 data-mel-spectrograms/
+checkpoints/
