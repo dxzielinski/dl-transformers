@@ -2,7 +2,6 @@
 Utility functions and classes for model training.
 """
 
-import timm
 import torch
 import lightning as L
 import torchmetrics
@@ -13,103 +12,6 @@ from torchtune.training import get_cosine_schedule_with_warmup
 
 from model_config import TASK, NUM_CLASSES
 from spectrogram_transformer import SpectrogramTransformer
-
-
-class GreyscaleTransformer(torch.nn.Module):
-    def __init__(
-        self,
-        image_size: int = 32,
-        patch_size: int = 2,
-        d_model: int = 128,
-        nhead: int = 2,
-        num_encoder_layers: int = 4,
-        num_decoder_layers: int = 1,
-        dim_feedforward: int = 2048,
-        dropout: float = 0.1,
-        num_classes: int = NUM_CLASSES,
-    ):
-        super().__init__()
-        assert image_size % patch_size == 0, (
-            "Image dimensions must be divisible by the patch size"
-        )
-        num_patches = (image_size // patch_size) ** 2
-        self.patch_embed = torch.nn.Conv2d(
-            in_channels=1,
-            out_channels=d_model,
-            kernel_size=patch_size,
-            stride=patch_size,
-        )
-        self.cls_token = torch.nn.Parameter(torch.zeros(1, 1, d_model))
-        self.pos_embed = torch.nn.Parameter(torch.zeros(1, num_patches + 1, d_model))
-
-        self.transformer = torch.nn.Transformer(
-            d_model=d_model,
-            nhead=nhead,
-            num_encoder_layers=num_encoder_layers,
-            num_decoder_layers=num_decoder_layers,
-            dim_feedforward=dim_feedforward,
-            dropout=dropout,
-            activation="gelu",
-        )
-
-        self.norm = torch.nn.LayerNorm(d_model)
-        self.fc = torch.nn.Linear(d_model, num_classes)
-
-        torch.nn.init.trunc_normal_(self.pos_embed, std=0.02)
-        torch.nn.init.trunc_normal_(self.cls_token, std=0.02)
-        torch.nn.init.trunc_normal_(self.patch_embed.weight, std=0.02)
-        if self.patch_embed.bias is not None:
-            torch.nn.init.zeros_(self.patch_embed.bias)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        b, _, _, _ = x.shape
-        x = self.patch_embed(x)
-        x = x.flatten(2).transpose(1, 2)
-        cls_tokens = self.cls_token.expand(b, -1, -1)
-        x = torch.cat((cls_tokens, x), dim=1)
-        x = x + self.pos_embed
-        src = x[:, 1:, :].permute(1, 0, 2)
-        tgt = x[:, :1, :].permute(1, 0, 2)
-        out = self.transformer(src=src, tgt=tgt)
-        out = out.squeeze(0)
-        out = self.norm(out)
-        logits = self.fc(out)
-        return logits
-
-
-def create_vit_tiny_greyscale(
-    num_classes: int = 12, pretrained: bool = False
-) -> torch.nn.Module:
-    """
-    Creates a ViT-Tiny model adapted for:
-      - 1-channel (greyscale) input
-      - custom number of classes
-    """
-    model = timm.create_model(
-        "vit_tiny_patch16_224",
-        pretrained=pretrained,
-        in_chans=1,
-        num_classes=num_classes,
-    )
-
-    return model
-
-
-def create_deit_tiny_greyscale(
-    num_classes: int = 12, pretrained: bool = False
-) -> torch.nn.Module:
-    """
-    Creates a DeiT-Tiny (distilled) model adapted for:
-      - 1-channel (greyscale) input
-      - custom number of classes
-    """
-    model = timm.create_model(
-        "deit_tiny_distilled_patch16_224",
-        pretrained=pretrained,
-        in_chans=1,
-        num_classes=num_classes,
-    )
-    return model
 
 
 class ModelTransformer(L.LightningModule):
