@@ -113,7 +113,12 @@ def create_deit_tiny_greyscale(
 
 
 class ModelTransformer(L.LightningModule):
-    def __init__(self, hyperparameters, weight=None):
+    def __init__(
+        self,
+        hyperparameters,
+        weight=None,
+        model=SpectrogramTransformer(num_classes=NUM_CLASSES, patch_size=4),
+    ):
         """
         Args:
             hyperparameters: dict containing model hyperparameters - it must contain the
@@ -123,7 +128,7 @@ class ModelTransformer(L.LightningModule):
                 - weight_decay: float, weight decay for the optimizer
         """
         super().__init__()
-        self.model = SpectrogramTransformer(patch_size=4, num_classes=NUM_CLASSES)
+        self.model = model
         self.learning_rate = hyperparameters["learning_rate"]
         self.loss_fn = torch.nn.CrossEntropyLoss(weight=weight)
         self.train_metrics = torchmetrics.MetricCollection(
